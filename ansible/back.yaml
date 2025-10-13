@@ -6,7 +6,7 @@
     mediawiki_version: "1.42.3"
     mediawiki_root: "/var/www/mediawiki"
     pgpool_host: "192.168.1.126"
-    pgpool_port: 9999
+    pgpool_port: 5432
     db_name: "mediawiki"
     db_user: "wikiuser"
     db_password: "StrongPass!"
@@ -102,33 +102,13 @@
         path: /etc/nginx/sites-enabled/default
         state: absent
 
-    - name: Скопировать LocalSettings.php (предварительно подготовленный)
+    - name: Копировать LocalSettings.php из репозитория
       copy:
+        src: "./LocalSettings.php"
         dest: "{{ mediawiki_root }}/LocalSettings.php"
         owner: www-data
         group: www-data
         mode: '0640'
-        content: |
-          <?php
-          $wgServer = "http://192.168.1.53";
-          $wgSitename = "MyWiki";
-          $wgScriptPath = "";
-          $wgDBtype = "postgres";
-          $wgDBserver = "{{ pgpool_host }}";
-          $wgDBport = {{ pgpool_port }};
-          $wgDBname = "{{ db_name }}";
-          $wgDBuser = "{{ db_user }}";
-          $wgDBpassword = "{{ db_password }}";
-          $wgLanguageCode = "ru";
-          $wgSecretKey = "ReplaceMeWithSecretKey";
-          $wgUpgradeKey = "ReplaceMeWithUpgradeKey";
-          $wgMainCacheType = CACHE_NONE;
-          $wgSessionCacheType = CACHE_NONE;
-          $wgEnableEmail = true;
-          $wgEmergencyContact = "admin@{{ site_domain }}";
-          $wgPasswordSender = "wiki@{{ site_domain }}";
-          $wgUploadDirectory = "$IP/images";
-          $wgUploadPath = "/images";
 
     - name: Проверить синтаксис Nginx
       command: nginx -t
