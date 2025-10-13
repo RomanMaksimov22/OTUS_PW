@@ -106,12 +106,13 @@
         state: absent
 
     - name: Копировать LocalSettings.php из репозитория
-      copy:
+      template:
         src: "./template/LocalSettings.php.j2"
         dest: "{{ mediawiki_root }}/LocalSettings.php"
         owner: www-data
         group: www-data
         mode: '0640'
+      become: yes
 
     - name: Проверить синтаксис Nginx
       command: nginx -t
