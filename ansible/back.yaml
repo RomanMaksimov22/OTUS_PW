@@ -1,0 +1,149 @@
+---
+- name: Установка MediaWiki backend (Nginx + PHP + Pgpool)
+  hosts: backends
+  become: yes
+  vars:
+    mediawiki_version: "1.42.3"
+    mediawiki_root: "/var/www/mediawiki"
+    pgpool_host: "192.168.1.126"
+    pgpool_port: 9999
+    db_name: "mediawiki"
+    db_user: "wikiuser"
+    db_password: "StrongPass!"
+    site_domain: "wiki.example.com"
+    php_version: "8.2"
+
+  tasks:
+    - name: Установка зависимостей
+      apt:
+        name:
+          - nginx
+          - php{{ php_version }}-fpm
+          - php{{ php_version }}-pgsql
+          - php{{ php_version }}-xml
+          - php{{ php_version }}-mbstring
+          - php{{ php_version }}-curl
+          - php{{ php_version }}-intl
+          - php{{ php_version }}-zip
+          - unzip
+          - curl
+        update_cache: yes
+
+    - name: Создать директорию MediaWiki
+      file:
+        path: "{{ mediawiki_root }}"
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: '0755'
+
+    - name: Скачать MediaWiki
+      get_url:
+        url: "https://releases.wikimedia.org/mediawiki/1.42/mediawiki-{{ mediawiki_version }}.tar.gz"
+        dest: /tmp/mediawiki.tar.gz
+
+    - name: Распаковать MediaWiki
+      unarchive:
+        src: /tmp/mediawiki.tar.gz
+        dest: /var/www/
+        remote_src: yes
+      notify: Restart nginx
+
+    - name: Переименовать директорию mediawiki
+      command: mv /var/www/mediawiki-{{ mediawiki_version }} {{ mediawiki_root }}
+      args:
+        creates: "{{ mediawiki_root }}/index.php"
+
+    - name: Установить права
+      file:
+        path: "{{ mediawiki_root }}"
+        owner: www-data
+        group: www-data
+        recurse: yes
+
+    - name: Настроить Nginx для MediaWiki
+      copy:
+        dest: /etc/nginx/sites-available/mediawiki.conf
+        content: |
+          server {
+              listen 80;
+              server_name {{ site_domain }} {{ ansible_host }};
+              root {{ mediawiki_root }};
+              index index.php;
+
+              location / {
+                  try_files $uri $uri/ @rewrite;
+              }
+
+              location @rewrite {
+                  rewrite ^/(.*)$ /index.php?title=$1&$args;
+              }
+
+              location ~ \.php$ {
+                  include snippets/fastcgi-php.conf;
+                  fastcgi_pass unix:/run/php/php{{ php_version }}-fpm.sock;
+              }
+
+              location ~* \.(js|css|png|jpg|jpeg|gif|ico)$ {
+                  expires max;
+                  log_not_found off;
+              }
+          }
+
+    - name: Включить сайт Nginx
+      file:
+        src: /etc/nginx/sites-available/mediawiki.conf
+        dest: /etc/nginx/sites-enabled/mediawiki.conf
+        state: link
+        force: yes
+
+    - name: Удалить дефолтный сайт Nginx
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Скопировать LocalSettings.php (предварительно подготовленный)
+      copy:
+        dest: "{{ mediawiki_root }}/LocalSettings.php"
+        owner: www-data
+        group: www-data
+        mode: '0640'
+        content: |
+          <?php
+          $wgSitename = "MyWiki";
+          $wgScriptPath = "";
+          $wgDBtype = "postgres";
+          $wgDBserver = "{{ pgpool_host }}";
+          $wgDBport = {{ pgpool_port }};
+          $wgDBname = "{{ db_name }}";
+          $wgDBuser = "{{ db_user }}";
+          $wgDBpassword = "{{ db_password }}";
+          $wgLanguageCode = "ru";
+          $wgSecretKey = "ReplaceMeWithSecretKey";
+          $wgUpgradeKey = "ReplaceMeWithUpgradeKey";
+          $wgMainCacheType = CACHE_NONE;
+          $wgSessionCacheType = CACHE_NONE;
+          $wgEnableEmail = true;
+          $wgEmergencyContact = "admin@{{ site_domain }}";
+          $wgPasswordSender = "wiki@{{ site_domain }}";
+          $wgUploadDirectory = "$IP/images";
+          $wgUploadPath = "/images";
+
+    - name: Проверить синтаксис Nginx
+      command: nginx -t
+      register: nginx_check
+      failed_when: "'successful' not in nginx_check.stdout"
+
+    - name: Перезапустить службы
+      service:
+        name: "{{ item }}"
+        state: restarted
+      loop:
+        - "nginx"
+        - "php{{ php_version }}-fpm"
+
+  handlers:
+    - name: Restart nginx
+      service:
+        name: nginx
+        state: restarted
