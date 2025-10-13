@@ -107,7 +107,7 @@
 
     - name: Копировать LocalSettings.php из репозитория
       copy:
-        src: "./template/LocalSettings.php"
+        src: "./template/LocalSettings.php.j2"
         dest: "{{ mediawiki_root }}/LocalSettings.php"
         owner: www-data
         group: www-data
