@@ -48,11 +48,14 @@
         dest: /var/www/
         remote_src: yes
       notify: Restart nginx
-
-    - name: Переименовать директорию mediawiki
-      command: mv /var/www/mediawiki-{{ mediawiki_version }} {{ mediawiki_root }}
+  
+    - name: Перенос содержимого MediaWiki в корень
+      shell: |
+        shopt -s dotglob
+        mv /var/www/mediawiki-{{ mediawiki_version }}/* {{ mediawiki_root }}/
+        rmdir /var/www/mediawiki-{{ mediawiki_version }}
       args:
-        creates: "{{ mediawiki_root }}/index.php"
+        executable: /bin/bash
 
     - name: Установить права
       file:
