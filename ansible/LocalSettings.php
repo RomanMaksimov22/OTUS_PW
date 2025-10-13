@@ -31,7 +31,7 @@ $wgSitename = 'WikiOtus';
 $wgScriptPath = '';
 
 ## The protocol and server name to use in fully-qualified URLs
-$wgServer = 'http://192.168.1.79';
+$wgServer = 'http://192.168.1.53';
 
 ## The URL path to static resources (images, scripts, etc.)
 $wgResourceBasePath = $wgScriptPath;
