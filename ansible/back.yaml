@@ -132,7 +132,7 @@
     - name: Проверить синтаксис Nginx
       command: nginx -t
       register: nginx_check
-      failed_when: "'successful' not in nginx_check.stdout"
+      failed_when: nginx_check.rc != 0
 
     - name: Перезапустить службы
       service:
