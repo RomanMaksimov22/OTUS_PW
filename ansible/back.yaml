@@ -11,7 +11,7 @@
     db_user: "wikiuser"
     db_password: "StrongPass!"
     site_domain: "wiki.example.com"
-    php_version: "8.2"
+    php_version: "8.1"
 
   tasks:
     - name: Установка зависимостей
