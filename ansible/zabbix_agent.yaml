@@ -1,0 +1,31 @@
+---
+- name: Install Zabbix Agent 7.0
+  hosts: all
+  become: yes
+  tasks:
+    - name: Add Zabbix repository
+      ansible.builtin.shell: |
+        wget https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_7.0-2+ubuntu$(lsb_release -rs)_all.deb -O /tmp/zabbix-release.deb
+        dpkg -i /tmp/zabbix-release.deb
+        apt update -y
+
+    - name: Install Zabbix agent
+      ansible.builtin.apt:
+        name: zabbix-agent
+        state: present
+
+    - name: Configure Zabbix agent
+      ansible.builtin.lineinfile:
+        path: /etc/zabbix/zabbix_agentd.conf
+        regexp: '^{{ item.key }}='
+        line: '{{ item.key }}={{ item.value }}'
+      loop:
+        - { key: 'Server', value: '192.168.1.102' }
+        - { key: 'ServerActive', value: '192.168.1.102' }
+        - { key: 'Hostname', value: '{{ ansible_hostname }}' }
+
+    - name: Enable and start zabbix-agent service
+      ansible.builtin.systemd:
+        name: zabbix-agent
+        state: restarted
+        enabled: yes
