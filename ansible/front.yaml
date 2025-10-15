@@ -88,11 +88,11 @@
     - name: Copy iptables.sh to remote host
       ansible.builtin.copy:
         src: ./files/iptables.sh        # локальный путь
-        dest: /home/mrs/files/iptables.sh # куда скопировать на сервер
+        dest: /home/mrs/iptables.sh # куда скопировать на сервер
         mode: '0755'
 
     - name: Execute iptables.sh
-      ansible.builtin.shell: /home/mrs/files/iptables.sh
+      ansible.builtin.shell: /home/mrs/iptables.sh
       args:
         executable: /bin/bash
 
