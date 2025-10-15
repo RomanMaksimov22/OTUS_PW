@@ -1,0 +1,65 @@
+---
+- name: Configure iptables rules
+  hosts: 192.168.1.106
+  become: yes
+  gather_facts: no
+
+  tasks:
+    - name: Install netfilter-persistent
+      apt:
+        name: netfilter-persistent
+        state: present
+    
+    - name: Install iptables (if not installed)
+      apt:
+        name: iptables
+        state: present
+
+    - name: Flush existing rules
+      ansible.builtin.command: >
+        iptables -F
+      ignore_errors: yes
+
+    - name: Flush NAT and custom chains
+      ansible.builtin.command: >
+        bash -c "iptables -X && iptables -t nat -F && iptables -t nat -X"
+      ignore_errors: yes
+
+    - name: Set default policies to DROP
+      ansible.builtin.shell: |
+        iptables -P INPUT DROP
+        iptables -P FORWARD DROP
+        iptables -P OUTPUT DROP
+
+    - name: Allow loopback traffic
+      ansible.builtin.shell: |
+        iptables -A INPUT -i lo -j ACCEPT
+        iptables -A OUTPUT -o lo -j ACCEPT
+
+    - name: Allow established and related connections
+      ansible.builtin.shell: |
+        iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+        iptables -A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
+    - name: Allow incoming HTTP and HTTPS
+      ansible.builtin.shell: |
+        iptables -A INPUT -p tcp --dport 80 -j ACCEPT
+        iptables -A INPUT -p tcp --dport 443 -j ACCEPT
+
+    - name: Allow incoming SSH only from 192.168.1.63
+      ansible.builtin.shell: |
+        iptables -A INPUT -p tcp -s 192.168.1.63 --dport 22 -j ACCEPT
+        iptables -A INPUT -p tcp -s 192.168.1.102 --dport 10050 -j ACCEPT
+
+    - name: Allow outgoing HTTP/HTTPS only to 192.168.1.79 and 192.168.1.53
+      ansible.builtin.shell: |
+        iptables -A OUTPUT -p tcp -d 192.168.1.79 --dport 80 -j ACCEPT
+        iptables -A OUTPUT -p tcp -d 192.168.1.79 --dport 443 -j ACCEPT
+        iptables -A OUTPUT -p tcp -d 192.168.1.53 --dport 80 -j ACCEPT
+        iptables -A OUTPUT -p tcp -d 192.168.1.53 --dport 443 -j ACCEPT
+        iptables -A OUTPUT -p tcp -d 192.168.1.102 --dport 10050 -j ACCEPT
+
+    - name: Save iptables rules
+      ansible.builtin.shell: netfilter-persistent save
+      when: ansible_os_family == "Debian"
+      ignore_errors: yes
