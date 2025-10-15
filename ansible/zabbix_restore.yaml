@@ -1,20 +1,20 @@
 ---
-- name: Restore Zabbix Server from backup
+- name: Restore Zabbix Server (MySQL) from backup
   hosts: zabbix
   become: yes
+
   vars:
-    db_type: "pgsql"            # варианты: pgsql или mysql
-    db_name: "zabbix"
-    db_user: "zabbix"
-    db_password: "ZabbixPass123!"
-    backup_dir: "/backup"       # где лежит твой бэкап
+    db_name: zabbix
+    db_user: zabbix
+    db_password: ZabbixPass123!
+    backup_dir: /backup
     backup_sql: "{{ backup_dir }}/zabbix_backup.sql"
+    
     backup_conf: "{{ backup_dir }}/zabbix_server.conf"
-    backup_ui: "{{ backup_dir }}/zabbix_ui.tar.gz"
-    web_conf: "{{ backup_dir }}/zabbix.conf.php"
+    backup_web_conf: "{{ backup_dir }}/zabbix.conf.php"
 
   tasks:
-    - name: Ensure Zabbix repository is present
+    - name: Ensure Zabbix repository is installed
       ansible.builtin.shell: |
         wget -q https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_7.0-2+ubuntu$(lsb_release -rs)_all.deb -O /tmp/zabbix-release.deb
         dpkg -i /tmp/zabbix-release.deb
@@ -22,68 +22,60 @@
       args:
         warn: false
 
-    - name: Install Zabbix packages
+    - name: Install Zabbix and MySQL packages
       ansible.builtin.apt:
         name:
-          - "zabbix-server-{{ 'pgsql' if db_type == 'pgsql' else 'mysql' }}"
+          - zabbix-server-mysql
           - zabbix-frontend-php
           - zabbix-apache-conf
           - zabbix-sql-scripts
           - zabbix-agent
+          - mysql-server
         state: present
         update_cache: yes
 
-    - name: Restore Zabbix database (PostgreSQL)
-      ansible.builtin.shell: |
-        sudo -u postgres psql -c "DROP DATABASE IF EXISTS {{ db_name }};"
-        sudo -u postgres psql -c "CREATE DATABASE {{ db_name }} OWNER {{ db_user }};"
-        sudo -u {{ db_user }} psql {{ db_name }} < {{ backup_sql }}
-      when: db_type == "pgsql"
+    - name: Ensure MySQL is running
+      ansible.builtin.systemd:
+        name: mysql
+        state: started
+        enabled: yes
 
-    - name: Restore Zabbix database (MySQL)
+    - name: Create Zabbix database and user
       ansible.builtin.shell: |
-        mysql -u root -p{{ db_password }} -e "DROP DATABASE IF EXISTS {{ db_name }};"
-        mysql -u root -p{{ db_password }} -e "CREATE DATABASE {{ db_name }} CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;"
-        mysql -u root -p{{ db_password }} {{ db_name }} < {{ backup_sql }}
-      when: db_type == "mysql"
+        mysql -u root -e "CREATE DATABASE IF NOT EXISTS {{ db_name }} CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;"
+        mysql -u root -e "CREATE USER IF NOT EXISTS '{{ db_user }}'@'localhost' IDENTIFIED BY '{{ db_password }}';"
+        mysql -u root -e "GRANT ALL PRIVILEGES ON {{ db_name }}.* TO '{{ db_user }}'@'localhost'; FLUSH PRIVILEGES;"
 
-    - name: Restore Zabbix configuration file
+    - name: Restore Zabbix database from SQL backup
+      ansible.builtin.shell: |
+        mysql -u root {{ db_name }} < {{ backup_sql }}
+      args:
+        warn: false
+
+    - name: Restore Zabbix server config
       ansible.builtin.copy:
-        src: "{{ backup_conf }}"
+        src: ./files/zabbix_server.conf
         dest: /etc/zabbix/zabbix_server.conf
         owner: zabbix
         group: zabbix
         mode: '0644'
 
-    - name: Restore web configuration
+    - name: Restore Zabbix frontend config (zabbix.conf.php)
       ansible.builtin.copy:
-        src: "{{ web_conf }}"
+        src: ./files/zabbix.conf.php
         dest: /etc/zabbix/web/zabbix.conf.php
         owner: www-data
         group: www-data
         mode: '0644'
-      when: web_conf is exists
-
-    - name: Restore Zabbix UI files
-      ansible.builtin.unarchive:
-        src: "{{ backup_ui }}"
-        dest: /
-        remote_src: yes
-      when: backup_ui is exists
-
-    - name: Fix permissions
-      ansible.builtin.file:
-        path: /usr/share/zabbix
-        owner: www-data
-        group: www-data
-        recurse: yes
-
-    - name: Enable and start services
+      when: backup_web_conf is exists
+      
+    - name: Restart services
       ansible.builtin.systemd:
         name: "{{ item }}"
-        enabled: yes
         state: restarted
+        enabled: yes
       loop:
+        - mysql
         - zabbix-server
         - zabbix-agent
         - apache2
