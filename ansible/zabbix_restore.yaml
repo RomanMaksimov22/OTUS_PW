@@ -1,0 +1,89 @@
+---
+- name: Restore Zabbix Server from backup
+  hosts: zabbix
+  become: yes
+  vars:
+    db_type: "pgsql"            # варианты: pgsql или mysql
+    db_name: "zabbix"
+    db_user: "zabbix"
+    db_password: "StrongPassword"
+    backup_dir: "/backup"       # где лежит твой бэкап
+    backup_sql: "{{ backup_dir }}/zabbix_backup.sql"
+    backup_conf: "{{ backup_dir }}/zabbix_server.conf"
+    backup_ui: "{{ backup_dir }}/zabbix_ui.tar.gz"
+    web_conf: "{{ backup_dir }}/zabbix.conf.php"
+
+  tasks:
+    - name: Ensure Zabbix repository is present
+      ansible.builtin.shell: |
+        wget -q https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_7.0-2+ubuntu$(lsb_release -rs)_all.deb -O /tmp/zabbix-release.deb
+        dpkg -i /tmp/zabbix-release.deb
+        apt update -y
+      args:
+        warn: false
+
+    - name: Install Zabbix packages
+      ansible.builtin.apt:
+        name:
+          - "zabbix-server-{{ 'pgsql' if db_type == 'pgsql' else 'mysql' }}"
+          - zabbix-frontend-php
+          - zabbix-apache-conf
+          - zabbix-sql-scripts
+          - zabbix-agent
+        state: present
+        update_cache: yes
+
+    - name: Restore Zabbix database (PostgreSQL)
+      ansible.builtin.shell: |
+        sudo -u postgres psql -c "DROP DATABASE IF EXISTS {{ db_name }};"
+        sudo -u postgres psql -c "CREATE DATABASE {{ db_name }} OWNER {{ db_user }};"
+        sudo -u {{ db_user }} psql {{ db_name }} < {{ backup_sql }}
+      when: db_type == "pgsql"
+
+    - name: Restore Zabbix database (MySQL)
+      ansible.builtin.shell: |
+        mysql -u root -p{{ db_password }} -e "DROP DATABASE IF EXISTS {{ db_name }};"
+        mysql -u root -p{{ db_password }} -e "CREATE DATABASE {{ db_name }} CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;"
+        mysql -u root -p{{ db_password }} {{ db_name }} < {{ backup_sql }}
+      when: db_type == "mysql"
+
+    - name: Restore Zabbix configuration file
+      ansible.builtin.copy:
+        src: "{{ backup_conf }}"
+        dest: /etc/zabbix/zabbix_server.conf
+        owner: zabbix
+        group: zabbix
+        mode: '0644'
+
+    - name: Restore web configuration
+      ansible.builtin.copy:
+        src: "{{ web_conf }}"
+        dest: /etc/zabbix/web/zabbix.conf.php
+        owner: www-data
+        group: www-data
+        mode: '0644'
+      when: web_conf is exists
+
+    - name: Restore Zabbix UI files
+      ansible.builtin.unarchive:
+        src: "{{ backup_ui }}"
+        dest: /
+        remote_src: yes
+      when: backup_ui is exists
+
+    - name: Fix permissions
+      ansible.builtin.file:
+        path: /usr/share/zabbix
+        owner: www-data
+        group: www-data
+        recurse: yes
+
+    - name: Enable and start services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        enabled: yes
+        state: restarted
+      loop:
+        - zabbix-server
+        - zabbix-agent
+        - apache2
