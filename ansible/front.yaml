@@ -26,27 +26,35 @@
 
     - name: Создать директорию для SSL
       file:
-        path: "/etc/nginx/ssl"
+        path: /etc/nginx/ssl
         state: directory
+        owner: root
+        group: root
         mode: '0700'
-     
-    - name: Копировать сертификаты crt
+
+    - name: Копировать приватный ключ SSL
       copy:
         src: "./files/mediawiki.otus-pw.ru.key"
-        dest: /etc/nginx/ssl/mediawiki.otus-pw.ru.key
-      become: yes
+        dest: "/etc/nginx/ssl/mediawiki.otus-pw.ru.key"
+        owner: root
+        group: root
+        mode: '0600'
 
-    - name: Копировать сертификаты key
+    - name: Копировать сертификат SSL
       copy:
         src: "./files/mediawiki.otus-pw.ru.crt"
-        dest: /etc/nginx/ssl/mediawiki.otus-pw.ru.key
-      become: yes
+        dest: "/etc/nginx/ssl/mediawiki.otus-pw.ru.crt"
+        owner: root
+        group: root
+        mode: '0644'
 
     - name: Копировать конфиг nginx
       template:
         src: "./template/wiki_frontend.conf.j2"
         dest: /etc/nginx/sites-available/wiki_frontend.conf
-      become: yes
+        owner: root
+        group: root
+        mode: '0644'
 
     - name: Включить конфигурацию сайта
       file:
