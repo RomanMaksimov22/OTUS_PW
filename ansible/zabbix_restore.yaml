@@ -6,7 +6,7 @@
     db_type: "pgsql"            # варианты: pgsql или mysql
     db_name: "zabbix"
     db_user: "zabbix"
-    db_password: "StrongPassword"
+    db_password: "ZabbixPass123!"
     backup_dir: "/backup"       # где лежит твой бэкап
     backup_sql: "{{ backup_dir }}/zabbix_backup.sql"
     backup_conf: "{{ backup_dir }}/zabbix_server.conf"
