@@ -1,0 +1,54 @@
+---
+- name: Установка frontend 
+  hosts: frontend
+  become: yes
+
+  vars:
+    backends:
+      - 192.168.1.53
+      - 192.168.1.79
+    domain_name: "mediawiki.otus-pw.ru"
+
+  tasks:
+    - name: Установка Nginx
+      apt:
+        name: nginx
+        state: present
+        update_cache: yes
+
+    - name: Создание директории для логов
+      file:
+        path: /var/log/nginx/wiki
+        state: directory
+        owner: www-data
+        group: adm
+        mode: '0755'
+
+    - name: Копировать конфиг nginx
+      template:
+        src: "./template/wiki_frontend.conf.j2"
+        dest: /etc/nginx/sites-available/wiki_frontend.conf
+      become: yes
+
+    - name: Включить конфигурацию сайта
+      file:
+        src: /etc/nginx/sites-available/wiki_frontend.conf
+        dest: /etc/nginx/sites-enabled/wiki_frontend.conf
+        state: link
+        force: yes
+
+    - name: Удалить дефолтный сайт Nginx
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Проверить конфигурацию Nginx
+      command: nginx -t
+      register: nginx_check
+      failed_when: nginx_check.rc != 0
+      changed_when: false
+
+    - name: Перезапустить Nginx
+      service:
+        name: nginx
+        state: restarted
