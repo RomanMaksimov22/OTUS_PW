@@ -19,8 +19,7 @@
         wget -q https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_7.0-2+ubuntu$(lsb_release -rs)_all.deb -O /tmp/zabbix-release.deb
         dpkg -i /tmp/zabbix-release.deb
         apt update -y
-      args:
-        warn: false
+
 
     - name: Install Zabbix and MySQL packages
       ansible.builtin.apt:
