@@ -16,6 +16,12 @@
         state: present
         update_cache: yes
 
+    - name: Установка netfilter-persistent
+      apt:
+        name: netfilter-persistent
+        state: present
+        update_cache: yes
+
     - name: Создание директории для логов
       file:
         path: /var/log/nginx/wiki
@@ -78,3 +84,19 @@
       service:
         name: nginx
         state: restarted
+
+    - name: Copy iptables.sh to remote host
+      ansible.builtin.copy:
+        src: ./files/iptables.sh        # локальный путь
+        dest: /home/mrs/files/iptables.sh # куда скопировать на сервер
+        mode: '0755'
+
+    - name: Execute iptables.sh
+      ansible.builtin.shell: /home/mrs/files/iptables.sh
+      args:
+        executable: /bin/bash
+
+    - name: Save iptables rules (Debian/Ubuntu)
+      ansible.builtin.shell: netfilter-persistent save
+      ignore_errors: yes
+
