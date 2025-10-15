@@ -36,7 +36,7 @@
         dest: /etc/nginx/ssl/mediawiki.otus-pw.ru.key
       become: yes
 
-      - name: Копировать сертификаты key
+    - name: Копировать сертификаты key
       copy:
         src: "./files/mediawiki.otus-pw.ru.crt"
         dest: /etc/nginx/ssl/mediawiki.otus-pw.ru.key
