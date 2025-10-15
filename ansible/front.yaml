@@ -30,7 +30,7 @@
         state: directory
         mode: '0700'
      
-     - name: Копировать сертификаты crt
+    - name: Копировать сертификаты crt
       copy:
         src: "./files/mediawiki.otus-pw.ru.key"
         dest: /etc/nginx/ssl/mediawiki.otus-pw.ru.key
