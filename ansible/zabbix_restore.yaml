@@ -48,8 +48,6 @@
     - name: Restore Zabbix database from SQL backup
       ansible.builtin.shell: |
         mysql -u root {{ db_name }} < {{ backup_sql }}
-      args:
-        warn: false
 
     - name: Restore Zabbix server config
       ansible.builtin.copy:
