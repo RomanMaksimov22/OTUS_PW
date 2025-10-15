@@ -24,6 +24,24 @@
         group: adm
         mode: '0755'
 
+    - name: Создать директорию для SSL
+      file:
+        path: "/etc/nginx/ssl"
+        state: directory
+        mode: '0700'
+     
+     - name: Копировать сертификаты crt
+      copy:
+        src: "./files/mediawiki.otus-pw.ru.key"
+        dest: /etc/nginx/ssl/mediawiki.otus-pw.ru.key
+      become: yes
+
+      - name: Копировать сертификаты key
+      copy:
+        src: "./files/mediawiki.otus-pw.ru.crt"
+        dest: /etc/nginx/ssl/mediawiki.otus-pw.ru.key
+      become: yes
+
     - name: Копировать конфиг nginx
       template:
         src: "./template/wiki_frontend.conf.j2"
