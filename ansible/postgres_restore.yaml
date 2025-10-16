@@ -82,14 +82,12 @@
         executable: /bin/bash
 
     - name: Восстановить базу из бэкапа (если дамп существует)
-      become_user: postgres
-      shell: "psql -d {{ db_name }} -f {{ db_backup_file }}"
+      shell: |
+        psql -d {{ db_name }} -f {{ db_backup_file }}
       args:
         executable: /bin/bash
-      when: db_backup_file is file
       register: restore_result
-      ignore_errors: yes
-
+  
     - name: Проверить результат восстановления
       debug:
         msg: "Результат восстановления: {{ restore_result.stdout | default('нет вывода') }}"
