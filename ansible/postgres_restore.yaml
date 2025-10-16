@@ -7,7 +7,7 @@
     db_name: mediawiki
     db_user: wikiuser
     db_password: "StrongPass!"
-    db_backup_file: "/tmp/mediawiki_backup.sql"
+    db_backup_file: "/backup/mediawiki_backup.sql"
     listen_address: "*"
     allow_network: "192.168.1.0/24"
 
