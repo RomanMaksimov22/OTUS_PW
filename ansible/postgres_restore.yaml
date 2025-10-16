@@ -2,6 +2,7 @@
 - name: Установка и восстановление PostgreSQL 14
   hosts: db_servers
   become: yes
+  become_method: su        # <- добавлено
   vars:
     pg_version: 14
     db_name: mediawiki
@@ -73,12 +74,6 @@
         lc_ctype: "en_US.UTF-8"
         template: "template0"
         state: present
-
-    - name: Скопировать файл резервной копии
-      copy:
-        src: "./mediawiki_backup.sql"
-        dest: "{{ db_backup_file }}"
-        mode: "0644"
 
     - name: Восстановить базу из бэкапа
       become_user: postgres
