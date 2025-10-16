@@ -2,7 +2,6 @@
 - name: Установка и восстановление PostgreSQL 14
   hosts: db_servers
   become: yes
-  become_method: su        # <- добавлено
   vars:
     pg_version: 14
     db_name: mediawiki
@@ -13,6 +12,14 @@
     allow_network: "192.168.1.0/24"
 
   tasks:
+    - name: Установить зависимости для PostgreSQL
+      apt:
+        name:
+          - gnupg
+          - wget
+        state: present
+        update_cache: yes
+
     - name: Добавить GPG-ключ PostgreSQL
       ansible.builtin.apt_key:
         url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
@@ -24,7 +31,7 @@
         state: present
 
     - name: Обновить кэш apt
-      ansible.builtin.apt:
+      apt:
         update_cache: yes
 
     - name: Установить PostgreSQL {{ pg_version }}
@@ -39,14 +46,13 @@
         state: started
         enabled: yes
 
-    - name: Разрешить подключения по сети
+    - name: Настроить listen_addresses
       lineinfile:
         path: "/etc/postgresql/{{ pg_version }}/main/postgresql.conf"
         regexp: "^#?listen_addresses ="
         line: "listen_addresses = '{{ listen_address }}'"
-        state: present
 
-    - name: Разрешить подключения от хостов {{ allow_network }}
+    - name: Разрешить подключения от сети {{ allow_network }}
       lineinfile:
         path: "/etc/postgresql/{{ pg_version }}/main/pg_hba.conf"
         insertafter: EOF
@@ -57,31 +63,34 @@
         name: postgresql
         state: restarted
 
-    - name: Создать пользователя базы данных
-      become_user: postgres
-      postgresql_user:
-        name: "{{ db_user }}"
-        password: "{{ db_password }}"
-        role_attr_flags: "LOGIN"
 
-    - name: Создать базу данных
-      become_user: postgres
-      postgresql_db:
-        name: "{{ db_name }}"
-        owner: "{{ db_user }}"
-        encoding: "UTF8"
-        lc_collate: "en_US.UTF-8"
-        lc_ctype: "en_US.UTF-8"
-        template: "template0"
-        state: present
+    - name: Создать пользователя базы данных через psql
+      shell: |
+        sudo -u postgres psql -c "CREATE USER {{ db_user }} WITH PASSWORD '{{ db_password }}' LOGIN;"
+      args:
+        executable: /bin/bash
 
-    - name: Восстановить базу из бэкапа
+    - name: Создать базу данных через createdb
+      shell: |
+        sudo -u postgres createdb \
+          -O "{{ db_user }}" \
+          -E UTF8 \
+          -l "en_US.UTF-8" \
+          -T template0 \
+          "{{ db_name }}"
+      args:
+        executable: /bin/bash
+
+    - name: Восстановить базу из бэкапа (если дамп существует)
       become_user: postgres
-      command: >
-        psql -d {{ db_name }} -f {{ db_backup_file }}
+      shell: "psql -d {{ db_name }} -f {{ db_backup_file }}"
+      args:
+        executable: /bin/bash
+      when: db_backup_file is file
       register: restore_result
       ignore_errors: yes
 
     - name: Проверить результат восстановления
       debug:
         msg: "Результат восстановления: {{ restore_result.stdout | default('нет вывода') }}"
+
