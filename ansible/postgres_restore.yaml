@@ -69,6 +69,7 @@
         sudo -u postgres psql -c "CREATE USER {{ db_user }} WITH PASSWORD '{{ db_password }}' LOGIN;"
       args:
         executable: /bin/bash
+      ignore_errors: yes
 
     - name: Создать базу данных через createdb
       shell: |
@@ -80,14 +81,15 @@
           "{{ db_name }}"
       args:
         executable: /bin/bash
+      ignore_errors: yes
 
-    - name: Восстановить базу из бэкапа (если дамп существует)
+    - name: Восстановить базу из бэкапа
       shell: |
-        psql -d {{ db_name }} -f {{ db_backup_file }}
+        sudo -u postgres psql -d "mediawiki" -f "/backup/mediawiki_backup.sql"
       args:
         executable: /bin/bash
       register: restore_result
-  
+
     - name: Проверить результат восстановления
       debug:
         msg: "Результат восстановления: {{ restore_result.stdout | default('нет вывода') }}"
